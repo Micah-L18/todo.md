@@ -1,0 +1,8 @@
+{
+  "name": "todo-md",
+  "version": "1.0.0",
+  "description": "Tiny local TODO list that reads and writes a TODO.md file",
+  "bin": { "todo-md": "server.js" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.21.0" }
+}

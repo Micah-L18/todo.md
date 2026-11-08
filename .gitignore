@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+
+# your own task list and its screenshots
+TODO.md
+todos/

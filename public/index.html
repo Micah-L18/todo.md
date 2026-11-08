@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TODO</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1b1b1b; --muted: #8b8b8b; --line: #e4e4e4; --hover: #f3f3f3; --side: #fafafa;
+    --p1: #c8321e; --p2: #b7791f; --p3: #3b6fc4;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151515; --fg: #e6e6e6; --muted: #777; --line: #2a2a2a; --hover: #1e1e1e; --side: #191919;
+      --p1: #f0705c; --p2: #e0a948; --p3: #7aa5ec;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    margin: 0; color: var(--fg);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  [hidden] { display: none !important; }
+  input, textarea, select { font: inherit; color: inherit; background: transparent; border: 0; outline: 0; }
+  button { font: inherit; font-size: 13px; color: inherit; background: none; border: 0; padding: 7px 12px; cursor: pointer; }
+  button:hover { background: var(--hover); }
+
+  /* ---- layout ---- */
+  .app { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  aside { background: var(--side); border-right: 1px solid var(--line); padding: 28px 10px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .brand { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 10px 10px; text-transform: uppercase; letter-spacing: .04em; }
+  #projects { display: flex; flex-direction: column; gap: 1px; }
+  .proj { display: flex; align-items: center; border-radius: 4px; }
+  .proj:hover { background: var(--hover); }
+  .proj.active { background: var(--line); }
+  .proj .go { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: 8px; text-align: left; font-size: 14px; padding: 6px 4px 6px 10px; background: none; }
+  .proj .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj .n { color: var(--muted); font: 12px/1.7 var(--mono); }
+  .proj.missing .name { color: var(--muted); text-decoration: line-through; }
+  .proj .rm { color: var(--muted); padding: 4px 8px; opacity: 0; background: none; }
+  .proj:hover .rm, .proj .rm:focus-visible { opacity: 1; }
+  #addProject { width: 100%; text-align: left; color: var(--muted); margin-top: 8px; border-radius: 4px; padding: 6px 10px; }
+  #addProject:hover { color: var(--fg); }
+
+  main { max-width: 700px; width: 100%; margin: 0 auto; padding: 28px 24px 80px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+  header > div { min-width: 0; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path { display: block; font: 12px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #plus {
+    flex: none; width: 34px; height: 34px; padding: 0; font-size: 22px; line-height: 1;
+    border: 1px solid var(--line); border-radius: 50%;
+  }
+
+  /* ---- add form ---- */
+  form#form { border: 1px solid var(--line); border-radius: 4px; margin-bottom: 8px; }
+  form#form.drag { border-color: var(--fg); }
+  #text { display: block; width: 100%; padding: 10px 12px; resize: vertical; min-height: 84px; line-height: 1.45; }
+  .row { display: flex; flex-wrap: wrap; border-top: 1px solid var(--line); }
+  .row > * { border-left: 1px solid var(--line); }
+  .row > :first-child { border-left: 0; }
+  #newPri { font-size: 13px; padding: 7px 8px; cursor: pointer; }
+  #newPri option, .pri option { color: initial; background: initial; }
+  #area { flex: 1; min-width: 120px; padding: 7px 12px; font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); padding: 0 2px 10px; }
+
+  #pending { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 12px 10px; }
+  #pending:empty { display: none; }
+  .thumb { position: relative; }
+  .thumb img { height: 48px; display: block; border: 1px solid var(--line); border-radius: 2px; cursor: zoom-in; }
+  .thumb button {
+    position: absolute; top: -7px; right: -7px; padding: 0 5px; line-height: 16px; font-size: 11px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+  }
+
+  /* ---- list ---- */
+  #list { margin-top: 12px; }
+  h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 28px 0 2px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .box { font: 13px/1.6 var(--mono); padding: 0; color: var(--muted); flex: none; white-space: pre; }
+  .box:hover { background: none; color: var(--fg); }
+  .doing .box { color: var(--fg); }
+  .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .text { white-space: pre-wrap; }
+  .done .text { color: var(--muted); text-decoration: line-through; }
+  .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .imgs a { cursor: zoom-in; }
+  .imgs img { display: block; max-height: 90px; max-width: 160px; border: 1px solid var(--line); border-radius: 2px; }
+
+  .pri {
+    flex: none; appearance: none; -webkit-appearance: none; cursor: pointer;
+    font: 600 11px/1 var(--mono); padding: 4px 6px; margin-top: 1px; border-radius: 3px;
+    border: 1px solid var(--line); color: var(--muted); text-align: center; width: 30px;
+  }
+  .pri.p1 { color: var(--p1); border-color: currentColor; }
+  .pri.p2 { color: var(--p2); border-color: currentColor; }
+  .pri.p3 { color: var(--p3); border-color: currentColor; }
+  .pri.p0 { opacity: 0; }
+  li:hover .pri.p0, .pri.p0:focus-visible { opacity: 1; }
+  .done .pri { opacity: .45; }
+  .done .pri.p0 { opacity: 0; }
+  .del { color: var(--muted); padding: 0 4px; line-height: 1.6; opacity: 0; }
+  li:hover .del, .del:focus-visible { opacity: 1; }
+  @media (hover: none) { .del, .pri.p0, .proj .rm { opacity: 1; } }
+
+  .empty { color: var(--muted); }
+  footer { margin-top: 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
+  label { cursor: pointer; user-select: none; }
+  label input { vertical-align: -1px; margin: 0 4px 0 0; }
+
+  /* ---- narrow screens: projects become a scrolling strip ---- */
+  @media (max-width: 760px) {
+    .app { display: block; }
+    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+    .brand { display: none; }
+    #projects { flex-direction: row; gap: 4px; }
+    .proj .go { white-space: nowrap; }
+    .proj .rm { display: none; }
+    #addProject { width: auto; margin: 0; white-space: nowrap; }
+    main { padding: 20px 16px 80px; }
+    #area { order: -1; flex-basis: 100%; border-left: 0; border-bottom: 1px solid var(--line); }
+    #newPri { border-left: 0; }
+    .row button { flex: 1; }
+  }
+
+  /* ---- dialogs ---- */
+  #viewer {
+    border: 0; padding: 0; margin: 0; max-width: none; max-height: none; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, .88); color: #eee;
+  }
+  #viewer[open] { display: flex; flex-direction: column; }
+  #viewer::backdrop { background: transparent; }
+  #viewer .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #viewer .stage img { max-width: 100%; max-height: 100%; object-fit: contain; background: #fff1; }
+  #viewer .bar { display: flex; align-items: center; gap: 4px; padding: 8px 12px; font-size: 13px; border-top: 1px solid #ffffff22; }
+  #viewer .bar button, #viewer .bar a { color: #eee; }
+  #viewer .bar button:hover, #viewer .bar a:hover { background: #ffffff1a; }
+  #viewer .bar button:disabled { opacity: .3; cursor: default; background: none; }
+  #viewer .name { flex: 1; min-width: 0; font: 12px var(--mono); color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px; }
+  #viewer .bar a { padding: 7px 12px; text-decoration: none; }
+
+  #picker {
+    width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--fg);
+  }
+  #picker::backdrop { background: rgba(0, 0, 0, .35); }
+  #picker h3 { font-size: 14px; margin: 0; padding: 14px 16px 10px; }
+  .prow { display: flex; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .prow button { border-left: 1px solid var(--line); }
+  .prow button:first-child { border-left: 0; border-right: 1px solid var(--line); }
+  #ppath { flex: 1; min-width: 0; padding: 7px 10px; font: 13px var(--mono); }
+  #pdirs { height: 300px; overflow-y: auto; padding: 4px 0; }
+  #pdirs li { border: 0; padding: 0; }
+  #pdirs button { width: 100%; text-align: left; font-size: 14px; padding: 5px 16px; display: flex; justify-content: space-between; }
+  #pdirs .tag { font: 11px var(--mono); color: var(--muted); }
+  #pdirs .none { color: var(--muted); font-size: 13px; padding: 8px 16px; }
+  #pstatus { font-size: 12px; color: var(--muted); padding: 10px 16px 0; margin: 0; border-top: 1px solid var(--line); }
+  .pact { display: flex; justify-content: flex-end; gap: 4px; padding: 10px 12px; }
+  .pact #pnew { margin-right: auto; }
+  #pnewRow { display: flex; margin: 10px 16px 0; border: 1px solid var(--line); border-radius: 4px; }
+  #pnewName { flex: 1; min-width: 0; padding: 6px 10px; font-size: 14px; }
+  #pnewRow button { border-left: 1px solid var(--line); }
+  .pact .primary { border: 1px solid var(--fg); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">Projects</div>
+    <nav id="projects"></nav>
+    <button type="button" id="addProject">+ Add project</button>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <h1 id="title">TODO</h1>
+        <span class="path" id="path"></span>
+      </div>
+      <button type="button" id="plus" title="Add a task (N)" aria-label="Add a task">+</button>
+    </header>
+
+    <form id="form" autocomplete="off" hidden>
+      <textarea id="text" rows="3" placeholder="What needs doing? Paste or drop images."></textarea>
+      <div id="pending"></div>
+      <div class="row">
+        <select id="newPri" title="Priority">
+          <option value="0">No priority</option>
+          <option value="1">P1 · high</option>
+          <option value="2">P2 · medium</option>
+          <option value="3">P3 · low</option>
+        </select>
+        <input id="area" list="areas" placeholder="Area (optional)">
+        <datalist id="areas"></datalist>
+        <button type="button" id="attach">Attach</button>
+        <button type="button" id="cancel">Cancel</button>
+        <button type="submit">Add</button>
+      </div>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+    </form>
+    <div class="hint" id="formHint" hidden>⌘/Ctrl + Enter to add · Esc to cancel</div>
+
+    <div id="list"></div>
+
+    <footer>
+      <span id="count"></span>
+      <label><input type="checkbox" id="hide">hide done</label>
+    </footer>
+  </main>
+</div>
+
+<dialog id="viewer" aria-label="Attachment viewer">
+  <div class="stage" id="vstage"><img id="vimg" alt=""></div>
+  <div class="bar">
+    <button type="button" id="vprev" title="Previous (←)">←</button>
+    <button type="button" id="vnext" title="Next (→)">→</button>
+    <span class="name" id="vname"></span>
+    <a id="vopen" target="_blank" rel="noopener" title="Open original in a new tab">Open</a>
+    <button type="button" id="vclose" title="Close (Esc)">Close</button>
+  </div>
+</dialog>
+
+<dialog id="picker" aria-label="Select project location">
+  <h3>Select project location</h3>
+  <div class="prow">
+    <button type="button" id="pup" title="Up one folder">↑</button>
+    <input id="ppath" spellcheck="false" aria-label="Folder path">
+    <button type="button" id="pgo">Go</button>
+  </div>
+  <ul id="pdirs"></ul>
+  <p id="pstatus"></p>
+  <div id="pnewRow" hidden>
+    <input id="pnewName" placeholder="New folder name" spellcheck="false" aria-label="New folder name">
+    <button type="button" id="pnewCreate">Create</button>
+    <button type="button" id="pnewCancel">Cancel</button>
+  </div>
+  <div class="pact">
+    <button type="button" id="pnew">+ New folder</button>
+    <button type="button" id="pcancel">Cancel</button>
+    <button type="button" id="puse" class="primary">Use this folder</button>
+  </div>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const BOX = { todo: '[ ]', doing: '[-]', done: '[X]' };
+const NEXT = { todo: 'doing', doing: 'done', done: 'todo' };
+const PRI_LABEL = ['–', 'P1', 'P2', 'P3'];
+let projects = [];
+let current = '';
+let state = { items: [], areas: [] };
+let pending = [];
+
+function el(tag, props = {}, ...kids) {
+  const e = Object.assign(document.createElement(tag), props);
+  e.append(...kids.filter((k) => k != null));
+  return e;
+}
+const src = (p) => /^(https?:|data:)/.test(p)
+  ? p
+  : '/f/' + p.split('/').map(encodeURIComponent).join('/') + '?project=' + encodeURIComponent(current);
+const ref = (it) => ({ line: it.line, raw: it.raw });
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+
+async function api(method, url, body) {
+  const r = await fetch(url, {
+    method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body && JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, data };
+}
+
+// ---- projects ----
+async function loadProjects() {
+  const { data } = await api('GET', '/api/projects');
+  projects = data.projects || [];
+  if (!projects.some((p) => p.file === current)) {
+    const saved = store.get('project');
+    current = (projects.find((p) => p.file === saved) || projects.find((p) => p.file === data.start) || projects[0] || {}).file || '';
+  }
+  renderProjects();
+}
+
+function renderProjects() {
+  $('#projects').replaceChildren(...projects.map((p) =>
+    el('div', { className: 'proj' + (p.file === current ? ' active' : '') + (p.missing ? ' missing' : ''), title: p.path },
+      el('button', { type: 'button', className: 'go', onclick: () => select(p.file) },
+        el('span', { className: 'name', textContent: p.name }),
+        el('span', { className: 'n', textContent: p.missing ? '' : p.open || '' })),
+      el('button', {
+        type: 'button', className: 'rm', textContent: '×', title: 'Remove from list (files stay on disk)',
+        onclick: () => removeProject(p),
+      }))));
+}
+
+async function select(file) {
+  if (file !== current) closeForm(true);
+  current = file;
+  store.set('project', file);
+  renderProjects();
+  await load();
+}
+
+async function removeProject(p) {
+  if (!confirm(`Remove "${p.name}" from the list?\n\nIts TODO.md and images stay on disk.`)) return;
+  await api('DELETE', '/api/projects', { project: p.file });
+  if (p.file === current) current = '';
+  await loadProjects();
+  await load();
+}
+
+// ---- todos ----
+async function load() {
+  if (!current) {
+    state = { items: [], areas: [] };
+    render();
+    return;
+  }
+  const r = await api('GET', '/api/todos?project=' + encodeURIComponent(current));
+  state = r.ok ? r.data : { items: [], areas: [], error: r.data.error };
+  render();
+}
+
+async function send(method, body) {
+  const r = await api(method, '/api/todos', { ...body, project: current });
+  if (!r.ok && r.status !== 409) alert(r.data.error || 'Something went wrong.');
+  await load();
+  return r.ok;
+}
+
+function row(it) {
+  const imgs = it.images.length
+    ? el('div', { className: 'imgs' }, ...it.images.map((p) =>
+        el('a', {
+          href: src(p), target: '_blank', title: p,
+          onclick: (e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let cmd-click open a tab
+            e.preventDefault();
+            view(it.images.map((q) => ({ url: src(q), name: q })), it.images.indexOf(p));
+          },
+        }, el('img', { src: src(p), alt: '', loading: 'lazy' }))))
+    : null;
+
+  const pri = el('select', {
+    className: 'pri p' + it.priority, title: 'Priority',
+    onchange: (e) => send('PATCH', { ...ref(it), priority: Number(e.target.value) }),
+  }, ...PRI_LABEL.map((l, i) => el('option', { value: i, textContent: l, selected: i === it.priority })));
+
+  return el('li', { className: it.status },
+    el('button', {
+      className: 'box', textContent: BOX[it.status], title: 'Click to change status',
+      onclick: () => send('PATCH', { ...ref(it), status: NEXT[it.status] }),
+    }),
+    pri,
+    el('div', { className: 'body' }, el('div', { className: 'text', textContent: it.text }), imgs),
+    el('button', {
+      className: 'del', textContent: '×', title: 'Delete',
+      onclick: () => confirm(`Delete "${it.text.split('\n')[0]}"?`) && send('DELETE', ref(it)),
+    }),
+  );
+}
+
+function render() {
+  const p = projects.find((x) => x.file === current);
+  $('#title').textContent = p ? p.name : 'No project';
+  $('#path').textContent = $('#path').title = p ? p.path + '/TODO.md' : '';
+  document.title = p ? `${p.name} · TODO` : 'TODO';
+  $('#plus').disabled = !current;
+  $('#areas').replaceChildren(...state.areas.map((a) => el('option', { value: a })));
+
+  const hide = $('#hide').checked;
+  const groups = new Map([['', []], ...state.areas.map((a) => [a, []])]);
+  for (const it of state.items) {
+    if (hide && it.status === 'done') continue;
+    if (!groups.has(it.area)) groups.set(it.area, []);
+    groups.get(it.area).push(it);
+  }
+  const rank = (it) => it.priority || 4; // P1 first, unprioritized last; file order otherwise
+
+  const out = [];
+  for (const [area, items] of groups) {
+    if (!items.length) continue;
+    items.sort((a, b) => rank(a) - rank(b));
+    if (area) out.push(el('h2', { textContent: area }));
+    out.push(el('ul', {}, ...items.map(row)));
+  }
+  if (!out.length) {
+    let msg = state.items.length ? 'All done.' : 'Nothing yet. Press + to add a task.';
+    if (state.error) msg = state.error;
+    if (!current) msg = 'No projects yet. Add one from the sidebar.';
+    out.push(el('p', { className: 'empty', textContent: msg }));
+  }
+  $('#list').replaceChildren(...out);
+
+  const open = state.items.filter((i) => i.status !== 'done').length;
+  $('#count').textContent = current ? `${open} open · ${state.items.length - open} done` : '';
+}
+
+// ---- adding ----
+function openForm() {
+  if (!current) return;
+  $('#form').hidden = $('#formHint').hidden = false;
+  $('#text').focus();
+}
+function closeForm(reset) {
+  $('#form').hidden = $('#formHint').hidden = true;
+  if (reset) {
+    $('#text').value = '';
+    $('#newPri').value = '0';
+    pending.forEach((p) => URL.revokeObjectURL(p.url));
+    pending = [];
+    renderPending();
+  }
+}
+$('#plus').onclick = () => ($('#form').hidden ? openForm() : closeForm(false));
+$('#cancel').onclick = () => closeForm(true);
+
+function addFiles(files) {
+  const imgs = [...files].filter((f) => f.type.startsWith('image/'));
+  if (!imgs.length || !current) return;
+  for (const f of imgs) pending.push({ file: f, url: URL.createObjectURL(f) });
+  renderPending();
+  openForm();
+}
+function renderPending() {
+  $('#pending').replaceChildren(...pending.map((p, i) =>
+    el('div', { className: 'thumb' },
+      el('img', {
+        src: p.url, alt: '', title: p.file.name,
+        onclick: () => view(pending.map((q) => ({ url: q.url, name: q.file.name || 'pasted image' })), i),
+      }),
+      el('button', {
+        type: 'button', textContent: '×', title: 'Remove',
+        onclick: () => { URL.revokeObjectURL(p.url); pending.splice(i, 1); renderPending(); },
+      }))));
+}
+const toDataUrl = (f) => new Promise((ok, no) => {
+  const r = new FileReader();
+  r.onload = () => ok(r.result);
+  r.onerror = no;
+  r.readAsDataURL(f);
+});
+
+$('#form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = $('#text').value;
+  if (!text.trim() && !pending.length) return;
+  const images = await Promise.all(pending.map((p) => toDataUrl(p.file)));
+  const ok = await send('POST', { text, area: $('#area').value.trim(), priority: Number($('#newPri').value), images });
+  if (ok) {
+    closeForm(true);
+    loadProjects();
+  }
+});
+$('#text').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $('#form').requestSubmit(); }
+});
+$('#form').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeForm(false); });
+
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+
+document.addEventListener('paste', (e) => {
+  if ($('#picker').open) return;
+  const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+document.addEventListener('dragover', (e) => { e.preventDefault(); $('#form').classList.add('drag'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('#form').classList.remove('drag'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  $('#form').classList.remove('drag');
+  addFiles(e.dataTransfer.files);
+});
+
+// "n" opens the add form when you're not typing somewhere.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest('input, textarea, select, dialog')) return;
+  e.preventDefault();
+  openForm();
+});
+
+// ---- project picker ----
+let browsing = null;
+async function browse(path) {
+  const r = await api('GET', '/api/dirs?path=' + encodeURIComponent(path || ''));
+  if (!r.ok) { $('#pstatus').textContent = r.data.error; return; }
+  const d = r.data;
+  browsing = d;
+  $('#ppath').value = d.display;
+  requestAnimationFrame(() => { $('#ppath').scrollLeft = $('#ppath').scrollWidth; }); // show the end of long paths
+  $('#pup').disabled = !d.parent;
+  const known = projects.some((p) => p.dir === d.path);
+  $('#pstatus').textContent = known
+    ? 'This folder is already a project.'
+    : d.hasTodo ? 'Has a TODO.md: it will be used as is.' : 'A TODO.md and todos/ folder will be created here.';
+  $('#pdirs').replaceChildren(...(d.dirs.length
+    ? d.dirs.map((x) => el('li', {},
+        el('button', { type: 'button', onclick: () => browse(x.path) },
+          el('span', { textContent: x.name + '/' }),
+          x.hasTodo ? el('span', { className: 'tag', textContent: 'TODO.md' }) : null)))
+    : [el('li', { className: 'none', textContent: 'No folders inside.' })]));
+  $('#pdirs').scrollTop = 0;
+}
+$('#addProject').onclick = () => {
+  const p = projects.find((x) => x.file === current);
+  $('#picker').showModal();
+  // Start next to the current project, since repos tend to live side by side.
+  browse(p && !p.missing ? p.dir.replace(/[\\/][^\\/]+$/, '') || '' : '');
+};
+$('#pup').onclick = () => browsing?.parent && browse(browsing.parent);
+$('#pgo').onclick = () => browse($('#ppath').value);
+$('#ppath').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); browse($('#ppath').value); } });
+$('#pcancel').onclick = () => $('#picker').close();
+
+// New folder: created inside the folder being browsed, then opened so "Use this folder" picks it.
+const hideNewFolder = () => { $('#pnewRow').hidden = true; $('#pnewName').value = ''; };
+$('#pnew').onclick = () => { $('#pnewRow').hidden = false; $('#pnewName').focus(); };
+$('#pnewCancel').onclick = hideNewFolder;
+async function createFolder() {
+  const name = $('#pnewName').value.trim();
+  if (!name || !browsing) return;
+  const r = await api('POST', '/api/dirs', { parent: browsing.path, name });
+  if (!r.ok) { $('#pstatus').textContent = r.data.error; $('#pnewName').focus(); return; }
+  hideNewFolder();
+  await browse(r.data.path);
+}
+$('#pnewCreate').onclick = createFolder;
+$('#pnewName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); createFolder(); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hideNewFolder(); }
+});
+$('#picker').addEventListener('close', hideNewFolder);
+$('#puse').onclick = async () => {
+  if (!browsing) return;
+  const r = await api('POST', '/api/projects', { dir: browsing.path });
+  if (!r.ok) { $('#pstatus').textContent = r.data.error; return; }
+  $('#picker').close();
+  await loadProjects();
+  await select(r.data.file);
+};
+
+// ---- viewer ----
+let gallery = [];
+let at = 0;
+function view(list, i) {
+  gallery = list;
+  at = Math.max(0, i);
+  showCurrent();
+  if (!$('#viewer').open) $('#viewer').showModal();
+}
+function showCurrent() {
+  const g = gallery[at];
+  $('#vimg').src = g.url;
+  $('#vopen').href = g.url;
+  $('#vname').textContent = gallery.length > 1 ? `${at + 1}/${gallery.length}  ${g.name}` : g.name;
+  $('#vprev').disabled = at === 0;
+  $('#vnext').disabled = at === gallery.length - 1;
+  $('#vprev').hidden = $('#vnext').hidden = gallery.length < 2;
+}
+const step = (d) => {
+  const n = at + d;
+  if (n >= 0 && n < gallery.length) { at = n; showCurrent(); }
+};
+$('#vprev').onclick = () => step(-1);
+$('#vnext').onclick = () => step(1);
+$('#vclose').onclick = () => $('#viewer').close();
+$('#vstage').onclick = (e) => { if (e.target === e.currentTarget) $('#viewer').close(); };
+// Listen on the document: a disabled button can drop focus out of the dialog.
+document.addEventListener('keydown', (e) => {
+  if (!$('#viewer').open) return;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
+});
+$('#viewer').addEventListener('close', () => $('#vimg').removeAttribute('src'));
+
+// ---- misc ----
+$('#hide').checked = store.get('hideDone') === '1';
+$('#hide').onchange = () => { store.set('hideDone', $('#hide').checked ? '1' : '0'); render(); };
+
+let countsTimer;
+new EventSource('/api/events').onmessage = (e) => {
+  let msg = {};
+  try { msg = JSON.parse(e.data); } catch {}
+  if (msg.file === current) load();
+  clearTimeout(countsTimer);
+  countsTimer = setTimeout(loadProjects, 150);
+};
+
+loadProjects().then(load);
+</script>
+</body>
+</html>
