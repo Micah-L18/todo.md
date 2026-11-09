@@ -26,14 +26,30 @@ const untilde = (p) => p.replace(/^~(?=$|[\\/])/, home);
 
 // The TODO.md named on the command line (default: ./TODO.md) — the page opens it first.
 let start = path.resolve(untilde(target || 'TODO.md'));
-try { if (fs.statSync(start).isDirectory()) start = path.join(start, 'TODO.md'); } catch {}
+try { if (fs.statSync(start).isDirectory()) start = findTodo(start); } catch {}
+
+// The TODO.md in a folder, matching an existing todo.md / Todo.md if there is one.
+function findTodo(dir) {
+  try {
+    const hit = fs.readdirSync(dir).find((n) => n.toLowerCase() === 'todo.md' && fs.statSync(path.join(dir, n)).isFile());
+    if (hit) return path.join(dir, hit);
+  } catch {}
+  return path.join(dir, 'TODO.md');
+}
+// One spelling per file, so the same TODO.md can't be added twice (case, symlinks, /tmp vs /private/tmp).
+function canon(file) {
+  try { return fs.realpathSync.native(file); } catch {}
+  try { return path.join(fs.realpathSync.native(path.dirname(file)), path.basename(file)); } catch {}
+  return file;
+}
 
 function httpError(status, message) {
   return Object.assign(new Error(message), { status });
 }
 
 // ---------- markdown ----------
-// - [ ] to do   - [-] in progress   - [X] done      optional trailing " !p1" / " !p2" / " !p3" = priority
+// - [ ] to do   - [-] in progress   - [X] done
+// Optional trailing priority tag: " !now" / " !next" / " !later" (old " !p1".. " !p3" still read).
 // Items are grouped under "## Area" headings. Indented lines under an item belong to it
 // (blank lines are allowed inside an item as long as an indented line follows).
 const ITEM = /^[-*] \[([ xX-])\](?: (.*))?$/;
@@ -42,7 +58,12 @@ const H1 = /^#\s/;
 const SECTION_BREAK = /^#{1,2}\s/;
 const CONT = /^(?: {2,}|\t)\S/;
 const IMG = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
-const PRI = /(^|\s+)!p([1-3])\s*$/i;
+const PRI = /(^|\s+)!(now|next|later|p[1-3])\s*$/i;
+const PRI_TAG = ['', 'now', 'next', 'later']; // priority number -> tag; 0 = unsorted
+const priOf = (tag) => (/^p\d$/i.test(tag) ? Number(tag[1]) : PRI_TAG.indexOf(tag.toLowerCase()));
+// API accepts 0-3 or a name: "now", "next", "later", "none"/"" (unsorted).
+const priIn = (v) => (typeof v === 'string' && !/^\d$/.test(v.trim()) ? (v.trim() === 'none' ? 0 : PRI_TAG.indexOf(v.trim().toLowerCase())) : Number(v));
+const tagOf = (n) => (n ? ` !${PRI_TAG[n]}` : '');
 const STATUS = { ' ': 'todo', '-': 'doing', x: 'done', X: 'done' };
 const MARK = { todo: ' ', doing: '-', done: 'X' };
 
@@ -83,7 +104,7 @@ function parse(lines) {
     let first = (m[2] || '').replace(IMG, (_, p) => { images.push(p); return ''; }).trim();
     let priority = 0;
     const pm = first.match(PRI);
-    if (pm) { priority = Number(pm[2]); first = first.slice(0, pm.index).trim(); }
+    if (pm) { priority = priOf(pm[2]); first = first.slice(0, pm.index).trim(); }
 
     const body = [];
     for (let j = i + 1; j < end; j++) {
@@ -160,7 +181,7 @@ function cleanText(s) {
 function itemBlock(text, priority, images) {
   const [first, ...rest] = text.split('\n');
   return [
-    `- [ ] ${first}${priority ? ` !p${priority}` : ''}`,
+    `- [ ] ${first}${tagOf(priority)}`,
     ...rest.map((l) => (l ? '  ' + l : '')),
     ...images.map((p) => `  ![](${p})`),
   ];
@@ -200,7 +221,8 @@ const CONFIG = path.join(CONFIG_DIR, 'projects.json');
 let projects = (() => {
   try {
     const j = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
-    return Array.isArray(j.projects) ? j.projects.filter((p) => typeof p === 'string') : [];
+    const list = Array.isArray(j.projects) ? j.projects.filter((p) => typeof p === 'string') : [];
+    return [...new Set(list.map(canon))];
   } catch { return []; }
 })();
 const saveProjects = () => {
@@ -215,8 +237,10 @@ function ensureProject(file) {
 
 function addProject(file) {
   ensureProject(file);
+  file = canon(file);
   if (!projects.includes(file)) { projects.push(file); saveProjects(); }
   watch(file);
+  return file;
 }
 
 // Resolve and validate the project a request is about. Only registered TODO.md files are touched.
@@ -238,26 +262,77 @@ app.use(express.json({ limit: '50mb' }));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.get('/api/projects', (req, res) => {
-  res.json({
-    start,
-    projects: projects.map((file) => {
-      const dir = path.dirname(file);
-      const p = { file, dir, name: path.basename(dir), path: tilde(dir), missing: !isDir(dir), open: 0, done: 0 };
-      if (!p.missing && fs.existsSync(file)) {
-        for (const it of parse(readLines(file)).items) it.status === 'done' ? p.done++ : p.open++;
-      }
-      return p;
-    }),
+function projectList() {
+  return projects.map((file) => {
+    const dir = path.dirname(file);
+    const p = { file, dir, name: path.basename(dir), path: tilde(dir), missing: !isDir(dir), open: 0, done: 0 };
+    if (!p.missing && fs.existsSync(file)) {
+      for (const it of parse(readLines(file)).items) it.status === 'done' ? p.done++ : p.open++;
+    }
+    return p;
   });
+}
+
+app.get('/api/projects', (req, res) => {
+  res.json({ start, projects: projectList() });
 });
 
+// Add a project: { dir } for a folder (TODO.md created if missing),
+// or { files: [...] } to import existing TODO.md files (e.g. from /api/scan).
 app.post('/api/projects', (req, res) => {
+  if (Array.isArray(req.body.files)) {
+    const added = [];
+    for (const f of req.body.files) {
+      const file = path.resolve(untilde(String(f || '')));
+      if (path.basename(file).toLowerCase() !== 'todo.md') throw httpError(400, `Not a TODO.md: ${tilde(file)}`);
+      if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw httpError(400, `File not found: ${tilde(file)}`);
+      added.push(addProject(file));
+    }
+    return res.json({ ok: true, added, file: added[0] });
+  }
   const dir = path.resolve(untilde(String(req.body.dir || '').trim()));
   if (!isDir(dir)) throw httpError(400, `Not a folder: ${tilde(dir)}`);
-  const file = path.join(dir, 'TODO.md');
-  addProject(file);
+  const file = addProject(findTodo(dir));
   res.json({ ok: true, file });
+});
+
+// Find existing TODO.md files under a folder, for importing them as projects.
+const SKIP_DIRS = new Set([
+  'node_modules', 'vendor', 'dist', 'build', 'out', 'target', 'coverage', 'venv', 'env', '__pycache__',
+  'Library', 'Applications', 'Pictures', 'Music', 'Movies', 'Photos', 'Public',
+]);
+app.get('/api/scan', (req, res) => {
+  const q = String(req.query.path || '').trim();
+  const root = q ? path.resolve(untilde(q)) : home;
+  if (!isDir(root)) throw httpError(400, `Not a folder: ${tilde(root)}`);
+  const maxDepth = Math.min(Math.max(Number(req.query.depth) || 5, 1), 8);
+  const deadline = Date.now() + 4000;
+  const found = [];
+  let scanned = 0;
+  let truncated = false;
+  const queue = [[root, 0]]; // breadth-first, so shallow (likely) projects are found first
+  while (queue.length) {
+    if (Date.now() > deadline || scanned > 30000 || found.length >= 300) { truncated = true; break; }
+    const [dir, depth] = queue.shift();
+    let ents;
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    scanned++;
+    for (const e of ents) {
+      if (e.isFile() && e.name.toLowerCase() === 'todo.md') found.push(path.join(dir, e.name));
+      else if (e.isDirectory() && depth < maxDepth && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) {
+        queue.push([path.join(dir, e.name), depth + 1]);
+      }
+    }
+  }
+  const results = found.map((f) => {
+    const file = canon(f);
+    const dir = path.dirname(file);
+    let open = 0;
+    let done = 0;
+    try { for (const it of parse(readLines(file)).items) it.status === 'done' ? done++ : open++; } catch {}
+    return { file, dir, name: path.basename(dir), path: tilde(dir), open, done, known: projects.includes(file) };
+  }).sort((a, b) => a.path.localeCompare(b.path));
+  res.json({ root, display: tilde(root), depth: maxDepth, scanned, truncated, results });
 });
 
 // Forget a project (files on disk are left alone).
@@ -307,7 +382,7 @@ app.post('/api/todos', (req, res) => {
   const file = project(req);
   const images = req.body.images || [];
   const area = String(req.body.area || '').replace(/\s+/g, ' ').trim().replace(/^#+\s*/, '');
-  const priority = [1, 2, 3].includes(Number(req.body.priority)) ? Number(req.body.priority) : 0;
+  const priority = [1, 2, 3].includes(priIn(req.body.priority)) ? priIn(req.body.priority) : 0;
   let text = cleanText(req.body.text);
   if (!text && !images.length) throw httpError(400, 'Nothing to add.');
   if (!text) text = 'Screenshot';
@@ -332,10 +407,10 @@ app.patch('/api/todos', (req, res) => {
     l = l.replace(/^([-*] \[)[ xX-]\]/, `$1${mark}]`);
   }
   if (req.body.priority !== undefined) {
-    const p = Number(req.body.priority);
+    const p = priIn(req.body.priority);
     if (![0, 1, 2, 3].includes(p)) throw httpError(400, 'Unknown priority.');
     l = l.replace(PRI, '').trimEnd();
-    if (p) l += ` !p${p}`;
+    l += tagOf(p);
   }
   lines[i] = l;
   writeLines(file, lines);
@@ -350,6 +425,97 @@ app.delete('/api/todos', (req, res) => {
   lines.splice(i, blockEnd(lines, i) - i);
   writeLines(file, lines);
   res.json({ ok: true });
+});
+
+// ---------- docs for agents ----------
+// One list drives both the Endpoints tab in the page and /llms.txt, so they can't drift apart.
+// "<file>" is replaced with a real project's TODO.md path.
+const ENDPOINTS = [
+  { group: 'Projects', method: 'GET', path: '/api/projects',
+    desc: 'List projects with open/done counts. Use a project\'s `file` as `project` in the calls below.' },
+  { group: 'Projects', method: 'POST', path: '/api/projects', body: { dir: '~/code/my-app' },
+    desc: 'Add a folder as a project. Creates TODO.md and todos/ in it if missing. To import existing files instead, send `{ "files": ["/path/to/TODO.md", ...] }`.' },
+  { group: 'Projects', method: 'GET', path: '/api/scan?path=~/code',
+    desc: 'Find existing TODO.md files under a folder (5 levels deep by default, `&depth=` up to 8). Each result has `file`, `open`, `done` and `known` (already a project).' },
+  { group: 'Projects', method: 'DELETE', path: '/api/projects', body: { project: '<file>' },
+    desc: 'Remove a project from the list. Its files stay on disk.' },
+  { group: 'Tasks', method: 'GET', path: '/api/todos?project=<file>',
+    desc: 'All tasks in a project: `{ items, areas }`. Each item has `line`, `raw`, `status`, `priority` (1 now, 2 next, 3 later, 0 unsorted), `text`, `area`, `images`.' },
+  { group: 'Tasks', method: 'POST', path: '/api/todos',
+    body: { project: '<file>', text: 'Fix the login redirect\nIt loops back to /login after OAuth.', priority: 'next', area: 'Auth' },
+    desc: 'Add a task. `priority`: now | next | later | none. `area` (optional) is a ## heading. `images` (optional): base64 data URLs. `\\n` in `text` becomes extra lines.' },
+  { group: 'Tasks', method: 'PATCH', path: '/api/todos',
+    body: { project: '<file>', line: 4, raw: '- [ ] Fix the login redirect !next', status: 'doing' },
+    desc: 'Change `status` (todo | doing | done) and/or `priority`. Copy `line` and `raw` from the item in GET /api/todos. A 409 means the task changed: re-read and retry.' },
+  { group: 'Tasks', method: 'DELETE', path: '/api/todos',
+    body: { project: '<file>', line: 4, raw: '- [ ] Fix the login redirect !next' },
+    desc: 'Delete a task and its indented lines.' },
+  { group: 'Folders', method: 'GET', path: '/api/dirs?path=~/code', desc: 'List the subfolders of a folder.' },
+  { group: 'Folders', method: 'POST', path: '/api/dirs', body: { parent: '~/code', name: 'new-app' }, desc: 'Create a folder.' },
+  { group: 'Live updates', method: 'GET', path: '/api/events',
+    desc: 'Server-sent events. Sends `{"file": "..."}` whenever a project\'s TODO.md changes.' },
+];
+
+const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+function endpointDocs(base, file) {
+  const fill = (v) => (typeof v === 'string' ? v.replace('<file>', file) : v);
+  return ENDPOINTS.map((e) => {
+    const p = e.path.replace('<file>', encodeURIComponent(file));
+    const body = e.body && Object.fromEntries(Object.entries(e.body).map(([k, v]) => [k, fill(v)]));
+    const curl = body
+      ? `curl -s -X ${e.method} ${base}${p} \\\n  -H 'Content-Type: application/json' \\\n  -d ${shq(JSON.stringify(body))}`
+      : `curl -s${e.path === '/api/events' ? 'N' : ''} ${shq(base + p)}`;
+    return { ...e, path: p, body, curl };
+  });
+}
+const baseUrl = (req) => `http://${req.headers.host || `localhost:${port}`}`;
+const docProject = (req) => (projects.includes(String(req.query.project)) ? String(req.query.project) : projects.includes(start) ? start : projects[0] || start);
+
+app.get('/api/endpoints', (req, res) => {
+  const base = baseUrl(req);
+  res.json({ base, guide: `${base}/llms.txt`, project: docProject(req), endpoints: endpointDocs(base, docProject(req)) });
+});
+
+// A guide written for AI agents (Claude etc.): what this is, the file format, and how to use the API.
+function guide(req) {
+  const base = baseUrl(req);
+  const list = projectList();
+  const eps = endpointDocs(base, docProject(req));
+  const L = [];
+  L.push('# todo-md', '');
+  L.push(`> A local task list. Each project is a folder with a plain TODO.md file. This server (${base}) reads and writes those files and shows them as a board in the browser. The page updates live when a file changes.`, '');
+  L.push('You can work with tasks in two ways. Use whichever is easier:', '');
+  L.push('1. **HTTP API** (below). Safest while the server is running: it keeps the format right and tells you if a task changed under you.');
+  L.push('2. **Edit the TODO.md directly** in the project folder, following the format below. The open page picks up the change.', '');
+  L.push('## Projects', '');
+  if (!list.length) L.push('No projects yet. Add one with `POST /api/projects`.');
+  for (const p of list) {
+    L.push(`- **${p.name}**: \`${p.file}\`${p.missing ? ' (folder missing)' : ` (${p.open} open, ${p.done} done)`}`);
+  }
+  L.push('', 'Pick the project whose folder matches the repo you are working in. Pass its path as `project`.', '');
+  L.push('## How to work with the list', '');
+  L.push('- Read the tasks before starting: `GET /api/todos?project=...`.');
+  L.push('- Work left to right: **now**, then **next**, then **later**. Unsorted tasks (no priority) have not been triaged yet.');
+  L.push('- When you start a task, set its status to `doing`. When it is finished, set it to `done`. Don\'t delete finished tasks unless asked.');
+  L.push('- Add tasks you discover along the way. Use `later` or no priority if you are unsure, and leave `now` for things the user said are urgent.');
+  L.push('- Keep task text short: the first line is the title, and extra lines are details.');
+  L.push('- When editing the file directly, only touch the lines you mean to change.', '');
+  L.push('## TODO.md format', '');
+  L.push('```markdown', '# TODO', '', '- [ ] a task with no area', '- [-] something in progress !now', '', '## Checkout page', '',
+    '- [ ] fix the coupon field !next', '  It rejects codes with lowercase letters.', '  ![](todos/coupon-bug.png)', '- [X] a finished task', '```', '');
+  L.push('- `- [ ]` to do, `- [-]` doing, `- [X]` done.');
+  L.push('- Priority is an optional tag at the end of the task line: `!now`, `!next` or `!later`. No tag means unsorted. Old `!p1`/`!p2`/`!p3` tags mean now/next/later.');
+  L.push('- `## Heading` is an area (a group of tasks). Tasks above the first `##` have no area.');
+  L.push('- Indented lines (2 spaces) under a task are its details. Images are `![](todos/name.png)`, relative to the TODO.md.', '');
+  L.push('## API', '');
+  L.push(`Base URL: ${base}. JSON in and out. Errors look like \`{"error": "..."}\`.`, '');
+  for (const e of eps) {
+    L.push(`### ${e.method} ${e.path.split('?')[0]}`, '', e.desc, '', '```sh', e.curl, '```', '');
+  }
+  return L.join('\n');
+}
+app.get(['/llms.txt', '/api/guide'], (req, res) => {
+  res.type('text/markdown; charset=utf-8').send(guide(req));
 });
 
 // Images referenced from a project's markdown, resolved relative to its TODO.md.
@@ -395,12 +561,13 @@ app.use((err, req, res, next) => {
 });
 
 // ---------- start ----------
-addProject(start);
+start = addProject(start);
 for (const f of projects) if (isDir(path.dirname(f))) watch(f);
 
 const server = app.listen(port, '127.0.0.1', () => {
   console.log(`todo-md  http://localhost:${port}`);
   console.log(`editing  ${tilde(start)}  (+${projects.length - 1} other project${projects.length === 2 ? '' : 's'})`);
+  console.log(`agents   http://localhost:${port}/llms.txt`);
 });
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') console.error(`Port ${port} is in use. Try --port ${port + 1}`);

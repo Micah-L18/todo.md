@@ -7,13 +7,13 @@
 <style>
   :root {
     --bg: #ffffff; --fg: #1b1b1b; --muted: #8b8b8b; --line: #e4e4e4; --hover: #f3f3f3; --side: #fafafa;
-    --p1: #c8321e; --p2: #b7791f; --p3: #3b6fc4;
+    --p1: #c8321e; --p2: #b7791f; --p3: #3b6fc4; --ok: #2e7d4f;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151515; --fg: #e6e6e6; --muted: #777; --line: #2a2a2a; --hover: #1e1e1e; --side: #191919;
-      --p1: #f0705c; --p2: #e0a948; --p3: #7aa5ec;
+      --p1: #f0705c; --p2: #e0a948; --p3: #7aa5ec; --ok: #5fbf87;
     }
   }
   * { box-sizing: border-box; }
@@ -29,7 +29,7 @@
 
   /* ---- layout ---- */
   .app { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
-  aside { background: var(--side); border-right: 1px solid var(--line); padding: 28px 10px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  aside { background: var(--side); border-right: 1px solid var(--line); padding: 28px 10px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
   .brand { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 10px 10px; text-transform: uppercase; letter-spacing: .04em; }
   #projects { display: flex; flex-direction: column; gap: 1px; }
   .proj { display: flex; align-items: center; border-radius: 4px; }
@@ -43,8 +43,41 @@
   .proj:hover .rm, .proj .rm:focus-visible { opacity: 1; }
   #addProject { width: 100%; text-align: left; color: var(--muted); margin-top: 8px; border-radius: 4px; padding: 6px 10px; }
   #addProject:hover { color: var(--fg); }
+  #endpointsTab {
+    margin-top: auto; width: 100%; text-align: left; font-size: 14px; color: var(--muted);
+    border-radius: 4px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;
+  }
+  #endpointsTab:hover { color: var(--fg); }
+  #endpointsTab.active { background: var(--line); color: var(--fg); }
+  #endpointsTab .k { font: 11px var(--mono); color: var(--muted); }
 
-  main { max-width: 700px; width: 100%; margin: 0 auto; padding: 28px 24px 80px; }
+  /* ---- endpoints view ---- */
+  #endpointsView { max-width: 820px; }
+  .lead { color: var(--muted); margin: -6px 0 20px; }
+  .agent { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px 16px; background: var(--side); margin-bottom: 8px; }
+  .agent h2 { font-size: 14px; margin: 0 0 4px; }
+  .agent p { margin: 0 0 10px; font-size: 14px; }
+  .agent .acts { display: flex; gap: 6px; margin-top: 10px; }
+  .agent .acts > * { border: 1px solid var(--line); border-radius: 4px; font-size: 13px; padding: 5px 10px; color: inherit; text-decoration: none; background: var(--bg); }
+  .agent .acts > :hover { background: var(--hover); }
+  .ep-note { font-size: 13px; color: var(--muted); margin: 18px 0 0; }
+  .ep-group { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 26px 0 4px; }
+  .ep { border-top: 1px solid var(--line); padding: 12px 0 14px; }
+  .ep-line { display: flex; align-items: center; gap: 10px; font: 13px var(--mono); overflow-wrap: anywhere; }
+  .method { flex: none; font: 600 11px/1 var(--mono); padding: 4px 0; width: 58px; text-align: center; border: 1px solid currentColor; border-radius: 3px; }
+  .m-GET { color: var(--p3); } .m-POST { color: var(--ok); } .m-PATCH { color: var(--p2); } .m-DELETE { color: var(--p1); }
+  .ep p { margin: 6px 0 8px; font-size: 14px; }
+  code { font: 12.5px var(--mono); background: var(--hover); padding: 1px 4px; border-radius: 3px; }
+  .snip { position: relative; }
+  .snip pre {
+    margin: 0; font: 12px/1.5 var(--mono); background: var(--side); border: 1px solid var(--line);
+    border-radius: 4px; padding: 10px 70px 10px 12px; overflow-x: auto; white-space: pre;
+  }
+  .agent .snip pre { background: var(--bg); white-space: pre-wrap; }
+  .snip .copy { position: absolute; top: 5px; right: 5px; font-size: 12px; padding: 3px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
+
+  main { max-width: 1240px; width: 100%; margin: 0 auto; padding: 28px 24px 80px; }
+  form#form, #formHint { max-width: 720px; }
   header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
   header > div { min-width: 0; }
   h1 { font-size: 20px; font-weight: 600; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -62,7 +95,7 @@
   .row > * { border-left: 1px solid var(--line); }
   .row > :first-child { border-left: 0; }
   #newPri { font-size: 13px; padding: 7px 8px; cursor: pointer; }
-  #newPri option, .pri option { color: initial; background: initial; }
+  #newPri option { color: initial; background: initial; }
   #area { flex: 1; min-width: 120px; padding: 7px 12px; font-size: 13px; }
   .hint { font-size: 12px; color: var(--muted); padding: 0 2px 10px; }
 
@@ -75,36 +108,53 @@
     background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
   }
 
-  /* ---- list ---- */
-  #list { margin-top: 12px; }
-  h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 28px 0 2px; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  /* ---- board: one column per priority, most urgent on the left ---- */
+  #board {
+    display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); gap: 12px;
+    margin-top: 14px; align-items: start;
+  }
+  .col {
+    --c: var(--muted);
+    background: var(--side); border: 1px solid var(--line); border-top: 3px solid var(--c);
+    border-radius: 6px; display: flex; flex-direction: column; min-height: 160px;
+  }
+  .col.p1 { --c: var(--p1); } .col.p2 { --c: var(--p2); } .col.p3 { --c: var(--p3); }
+  .col.over { outline: 2px dashed var(--c); outline-offset: 2px; }
+  .col-head { display: flex; align-items: center; gap: 8px; padding: 8px 6px 6px 12px; }
+  .col-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--c); }
+  .col-head .sub { font-size: 12px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col-head .n { font: 12px var(--mono); color: var(--muted); }
+  .col-head .add { padding: 0 8px; font-size: 17px; line-height: 24px; color: var(--muted); border-radius: 4px; }
+  .col-head .add:hover { color: var(--fg); }
+  .col ul { list-style: none; margin: 0; padding: 2px 8px 8px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .col .none { font-size: 12px; color: var(--muted); padding: 6px 4px; }
+
+  .card {
+    display: flex; align-items: flex-start; gap: 8px; padding: 8px 6px 8px 10px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 4px; cursor: grab;
+  }
+  .card:active { cursor: grabbing; }
+  .card.dragging { opacity: .35; }
   .box { font: 13px/1.6 var(--mono); padding: 0; color: var(--muted); flex: none; white-space: pre; }
   .box:hover { background: none; color: var(--fg); }
   .doing .box { color: var(--fg); }
-  .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .body { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
   .text { white-space: pre-wrap; }
   .done .text { color: var(--muted); text-decoration: line-through; }
+  .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .area { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; }
   .imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .imgs a { cursor: zoom-in; }
-  .imgs img { display: block; max-height: 90px; max-width: 160px; border: 1px solid var(--line); border-radius: 2px; }
-
-  .pri {
-    flex: none; appearance: none; -webkit-appearance: none; cursor: pointer;
-    font: 600 11px/1 var(--mono); padding: 4px 6px; margin-top: 1px; border-radius: 3px;
-    border: 1px solid var(--line); color: var(--muted); text-align: center; width: 30px;
-  }
-  .pri.p1 { color: var(--p1); border-color: currentColor; }
-  .pri.p2 { color: var(--p2); border-color: currentColor; }
-  .pri.p3 { color: var(--p3); border-color: currentColor; }
-  .pri.p0 { opacity: 0; }
-  li:hover .pri.p0, .pri.p0:focus-visible { opacity: 1; }
-  .done .pri { opacity: .45; }
-  .done .pri.p0 { opacity: 0; }
+  .imgs img { display: block; max-height: 64px; max-width: 110px; border: 1px solid var(--line); border-radius: 2px; }
+  .side { display: flex; align-items: center; flex: none; }
   .del { color: var(--muted); padding: 0 4px; line-height: 1.6; opacity: 0; }
-  li:hover .del, .del:focus-visible { opacity: 1; }
-  @media (hover: none) { .del, .pri.p0, .proj .rm { opacity: 1; } }
+  .move {
+    appearance: none; -webkit-appearance: none; cursor: pointer; opacity: 0;
+    font-size: 12px; color: var(--muted); padding: 0 4px; width: 22px; text-align: center;
+  }
+  .move option { color: initial; background: initial; }
+  .card:hover .del, .card:hover .move, .del:focus-visible, .move:focus-visible { opacity: 1; }
+  @media (hover: none) { .del, .move, .proj .rm { opacity: 1; } }
 
   .empty { color: var(--muted); }
   footer { margin-top: 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
@@ -114,17 +164,21 @@
   /* ---- narrow screens: projects become a scrolling strip ---- */
   @media (max-width: 760px) {
     .app { display: block; }
-    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+    aside { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-direction: row; align-items: center; gap: 6px; overflow-x: auto; }
     .brand { display: none; }
     #projects { flex-direction: row; gap: 4px; }
     .proj .go { white-space: nowrap; }
     .proj .rm { display: none; }
-    #addProject { width: auto; margin: 0; white-space: nowrap; }
+    #addProject, #importProject { width: auto; margin: 0; white-space: nowrap; }
+    #endpointsTab { width: auto; margin: 0 0 0 auto; white-space: nowrap; flex: none; }
+    #endpointsTab .k { display: none; }
     main { padding: 20px 16px 80px; }
     #area { order: -1; flex-basis: 100%; border-left: 0; border-bottom: 1px solid var(--line); }
     #newPri { border-left: 0; }
     .row button { flex: 1; }
   }
+  @media (max-width: 1000px) { #board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { #board { grid-template-columns: minmax(0, 1fr); } .col { min-height: 0; } }
 
   /* ---- dialogs ---- */
   #viewer {
@@ -151,19 +205,34 @@
   .prow { display: flex; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .prow button { border-left: 1px solid var(--line); }
   .prow button:first-child { border-left: 0; border-right: 1px solid var(--line); }
-  #ppath { flex: 1; min-width: 0; padding: 7px 10px; font: 13px var(--mono); }
+  #ppath, #spath { flex: 1; min-width: 0; padding: 7px 10px; font: 13px var(--mono); }
   #pdirs { height: 300px; overflow-y: auto; padding: 4px 0; }
   #pdirs li { border: 0; padding: 0; }
   #pdirs button { width: 100%; text-align: left; font-size: 14px; padding: 5px 16px; display: flex; justify-content: space-between; }
   #pdirs .tag { font: 11px var(--mono); color: var(--muted); }
   #pdirs .none { color: var(--muted); font-size: 13px; padding: 8px 16px; }
-  #pstatus { font-size: 12px; color: var(--muted); padding: 10px 16px 0; margin: 0; border-top: 1px solid var(--line); }
+  #pstatus, #sstatus { font-size: 12px; color: var(--muted); padding: 10px 16px 0; margin: 0; border-top: 1px solid var(--line); }
   .pact { display: flex; justify-content: flex-end; gap: 4px; padding: 10px 12px; }
   .pact #pnew { margin-right: auto; }
   #pnewRow { display: flex; margin: 10px 16px 0; border: 1px solid var(--line); border-radius: 4px; }
   #pnewName { flex: 1; min-width: 0; padding: 6px 10px; font-size: 14px; }
   #pnewRow button { border-left: 1px solid var(--line); }
   .pact .primary { border: 1px solid var(--fg); border-radius: 4px; }
+  .pact .primary:disabled { opacity: .4; cursor: default; }
+  .ptabs { display: flex; gap: 2px; padding: 0 12px 8px; }
+  .ptabs button { border-radius: 4px; color: var(--muted); }
+  .ptabs button.on { background: var(--line); color: var(--fg); }
+  #sres { height: 300px; overflow-y: auto; padding: 4px 0; margin: 0; list-style: none; }
+  #sres label { display: flex; align-items: flex-start; gap: 10px; padding: 6px 16px; cursor: pointer; }
+  #sres label:hover { background: var(--hover); }
+  #sres input { margin: 3px 0 0; }
+  #sres .nm { font-size: 14px; }
+  #sres .pt { display: block; font: 11px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+  #sres .ct { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; padding-top: 2px; }
+  #sres .known { opacity: .55; cursor: default; }
+  #sres .none { color: var(--muted); font-size: 13px; padding: 8px 16px; }
+  #importProject { width: 100%; text-align: left; color: var(--muted); border-radius: 4px; padding: 6px 10px; }
+  #importProject:hover { color: var(--fg); }
 </style>
 </head>
 <body>
@@ -172,9 +241,12 @@
     <div class="brand">Projects</div>
     <nav id="projects"></nav>
     <button type="button" id="addProject">+ Add project</button>
+    <button type="button" id="importProject" title="Find TODO.md files you already have">⤓ Import existing</button>
+    <button type="button" id="endpointsTab" title="API endpoints and a guide for AI agents">Endpoints <span class="k">API</span></button>
   </aside>
 
   <main>
+   <div id="boardView">
     <header>
       <div>
         <h1 id="title">TODO</h1>
@@ -188,10 +260,10 @@
       <div id="pending"></div>
       <div class="row">
         <select id="newPri" title="Priority">
-          <option value="0">No priority</option>
-          <option value="1">P1 · high</option>
-          <option value="2">P2 · medium</option>
-          <option value="3">P3 · low</option>
+          <option value="1">Now</option>
+          <option value="2">Next</option>
+          <option value="3">Later</option>
+          <option value="0">Unsorted</option>
         </select>
         <input id="area" list="areas" placeholder="Area (optional)">
         <datalist id="areas"></datalist>
@@ -203,12 +275,24 @@
     </form>
     <div class="hint" id="formHint" hidden>⌘/Ctrl + Enter to add · Esc to cancel</div>
 
-    <div id="list"></div>
+    <div id="board"></div>
 
     <footer>
       <span id="count"></span>
       <label><input type="checkbox" id="hide">hide done</label>
     </footer>
+   </div>
+
+   <section id="endpointsView" hidden>
+    <header>
+      <div>
+        <h1>Endpoints</h1>
+        <span class="path" id="epBase"></span>
+      </div>
+    </header>
+    <p class="lead">Claude, scripts or anything else can read and update your TODO lists over HTTP while this server is running.</p>
+    <div id="epBody"></div>
+   </section>
   </main>
 </div>
 
@@ -223,8 +307,13 @@
   </div>
 </dialog>
 
-<dialog id="picker" aria-label="Select project location">
-  <h3>Select project location</h3>
+<dialog id="picker" aria-label="Add project">
+  <h3>Add project</h3>
+  <div class="ptabs">
+    <button type="button" id="tabFolder" class="on">Choose a folder</button>
+    <button type="button" id="tabFind">Find existing TODO.md</button>
+  </div>
+ <div id="paneFolder">
   <div class="prow">
     <button type="button" id="pup" title="Up one folder">↑</button>
     <input id="ppath" spellcheck="false" aria-label="Folder path">
@@ -242,13 +331,36 @@
     <button type="button" id="pcancel">Cancel</button>
     <button type="button" id="puse" class="primary">Use this folder</button>
   </div>
+ </div>
+ <div id="paneFind" hidden>
+  <div class="prow">
+    <input id="spath" spellcheck="false" aria-label="Folder to search">
+    <button type="button" id="sgo">Search</button>
+  </div>
+  <ul id="sres"></ul>
+  <p id="sstatus"></p>
+  <div class="pact">
+    <button type="button" id="sall" style="margin-right:auto">Select all</button>
+    <button type="button" id="scancel">Cancel</button>
+    <button type="button" id="simport" class="primary" disabled>Import</button>
+  </div>
+ </div>
 </dialog>
 
 <script>
 const $ = (s) => document.querySelector(s);
 const BOX = { todo: '[ ]', doing: '[-]', done: '[X]' };
 const NEXT = { todo: 'doing', doing: 'done', done: 'todo' };
-const PRI_LABEL = ['–', 'P1', 'P2', 'P3'];
+// Columns left to right, most urgent first. Priority numbers match the server: 1 now, 2 next, 3 later, 0 unsorted.
+const COLS = [
+  { pri: 1, name: 'Now', sub: 'do it today' },
+  { pri: 2, name: 'Next', sub: 'up after that' },
+  { pri: 3, name: 'Later', sub: 'when there\'s time' },
+  { pri: 0, name: 'Unsorted', sub: 'not prioritized yet' },
+];
+const STATUS_ORDER = { doing: 0, todo: 1, done: 2 };
+let dragging = null;
+let page = 'board'; // 'board' | 'endpoints'
 let projects = [];
 let current = '';
 let state = { items: [], areas: [] };
@@ -289,7 +401,7 @@ async function loadProjects() {
 
 function renderProjects() {
   $('#projects').replaceChildren(...projects.map((p) =>
-    el('div', { className: 'proj' + (p.file === current ? ' active' : '') + (p.missing ? ' missing' : ''), title: p.path },
+    el('div', { className: 'proj' + (p.file === current && page === 'board' ? ' active' : '') + (p.missing ? ' missing' : ''), title: p.path },
       el('button', { type: 'button', className: 'go', onclick: () => select(p.file) },
         el('span', { className: 'name', textContent: p.name }),
         el('span', { className: 'n', textContent: p.missing ? '' : p.open || '' })),
@@ -302,6 +414,7 @@ function renderProjects() {
 async function select(file) {
   if (file !== current) closeForm(true);
   current = file;
+  showView('board');
   store.set('project', file);
   renderProjects();
   await load();
@@ -334,36 +447,84 @@ async function send(method, body) {
   return r.ok;
 }
 
-function row(it) {
+function card(it) {
   const imgs = it.images.length
     ? el('div', { className: 'imgs' }, ...it.images.map((p) =>
         el('a', {
-          href: src(p), target: '_blank', title: p,
+          href: src(p), target: '_blank', title: p, draggable: false,
           onclick: (e) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let cmd-click open a tab
             e.preventDefault();
             view(it.images.map((q) => ({ url: src(q), name: q })), it.images.indexOf(p));
           },
-        }, el('img', { src: src(p), alt: '', loading: 'lazy' }))))
+        }, el('img', { src: src(p), alt: '', loading: 'lazy', draggable: false }))))
     : null;
 
-  const pri = el('select', {
-    className: 'pri p' + it.priority, title: 'Priority',
+  // Keyboard/touch alternative to dragging between columns.
+  const move = el('select', {
+    className: 'move', title: 'Move to…',
     onchange: (e) => send('PATCH', { ...ref(it), priority: Number(e.target.value) }),
-  }, ...PRI_LABEL.map((l, i) => el('option', { value: i, textContent: l, selected: i === it.priority })));
+  },
+    el('option', { value: it.priority, textContent: '⇄', selected: true, disabled: true }),
+    ...COLS.filter((c) => c.pri !== it.priority).map((c) => el('option', { value: c.pri, textContent: 'Move to ' + c.name })));
 
-  return el('li', { className: it.status },
+  const li = el('li', { className: 'card ' + it.status, draggable: true },
     el('button', {
       className: 'box', textContent: BOX[it.status], title: 'Click to change status',
       onclick: () => send('PATCH', { ...ref(it), status: NEXT[it.status] }),
     }),
-    pri,
-    el('div', { className: 'body' }, el('div', { className: 'text', textContent: it.text }), imgs),
-    el('button', {
-      className: 'del', textContent: '×', title: 'Delete',
-      onclick: () => confirm(`Delete "${it.text.split('\n')[0]}"?`) && send('DELETE', ref(it)),
-    }),
+    el('div', { className: 'body' },
+      el('div', { className: 'text', textContent: it.text }),
+      it.area ? el('div', { className: 'meta' }, el('span', { className: 'area', textContent: it.area })) : null,
+      imgs),
+    el('div', { className: 'side' },
+      el('button', {
+        className: 'del', textContent: '×', title: 'Delete',
+        onclick: () => confirm(`Delete "${it.text.split('\n')[0]}"?`) && send('DELETE', ref(it)),
+      }),
+      move),
   );
+  li.addEventListener('dragstart', (e) => {
+    dragging = it;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', it.text);
+    requestAnimationFrame(() => li.classList.add('dragging'));
+  });
+  li.addEventListener('dragend', () => {
+    dragging = null;
+    li.classList.remove('dragging');
+    document.querySelectorAll('.col.over').forEach((c) => c.classList.remove('over'));
+  });
+  return li;
+}
+
+function column(c, items) {
+  const col = el('section', { className: 'col p' + c.pri },
+    el('div', { className: 'col-head' },
+      el('h2', { textContent: c.name }),
+      el('span', { className: 'sub', textContent: c.sub }),
+      el('span', { className: 'n', textContent: items.length || '' }),
+      el('button', { type: 'button', className: 'add', textContent: '+', title: `Add to ${c.name}`, onclick: () => openForm(c.pri) })),
+    el('ul', {}, ...(items.length ? items.map(card) : [el('li', { className: 'none', textContent: 'Nothing here.' })])));
+
+  col.addEventListener('dragover', (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    col.classList.add('over');
+  });
+  col.addEventListener('dragleave', (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove('over'); });
+  col.addEventListener('drop', (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    col.classList.remove('over');
+    const it = dragging;
+    dragging = null;
+    if (it.priority !== c.pri) send('PATCH', { ...ref(it), priority: c.pri });
+  });
+  return col;
 }
 
 function render() {
@@ -374,37 +535,32 @@ function render() {
   $('#plus').disabled = !current;
   $('#areas').replaceChildren(...state.areas.map((a) => el('option', { value: a })));
 
+  if (!current || state.error) {
+    const msg = !current ? 'No projects yet. Add one from the sidebar.' : state.error;
+    $('#board').replaceChildren(el('p', { className: 'empty', textContent: msg }));
+    $('#count').textContent = '';
+    return;
+  }
+
   const hide = $('#hide').checked;
-  const groups = new Map([['', []], ...state.areas.map((a) => [a, []])]);
+  const byPri = new Map(COLS.map((c) => [c.pri, []]));
   for (const it of state.items) {
     if (hide && it.status === 'done') continue;
-    if (!groups.has(it.area)) groups.set(it.area, []);
-    groups.get(it.area).push(it);
+    (byPri.get(it.priority) || byPri.get(0)).push(it);
   }
-  const rank = (it) => it.priority || 4; // P1 first, unprioritized last; file order otherwise
-
-  const out = [];
-  for (const [area, items] of groups) {
-    if (!items.length) continue;
-    items.sort((a, b) => rank(a) - rank(b));
-    if (area) out.push(el('h2', { textContent: area }));
-    out.push(el('ul', {}, ...items.map(row)));
-  }
-  if (!out.length) {
-    let msg = state.items.length ? 'All done.' : 'Nothing yet. Press + to add a task.';
-    if (state.error) msg = state.error;
-    if (!current) msg = 'No projects yet. Add one from the sidebar.';
-    out.push(el('p', { className: 'empty', textContent: msg }));
-  }
-  $('#list').replaceChildren(...out);
+  // In progress first, done last; file order otherwise.
+  for (const items of byPri.values()) items.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+  $('#board').replaceChildren(...COLS.map((c) => column(c, byPri.get(c.pri))));
 
   const open = state.items.filter((i) => i.status !== 'done').length;
-  $('#count').textContent = current ? `${open} open · ${state.items.length - open} done` : '';
+  $('#count').textContent = `${open} open · ${state.items.length - open} done`;
 }
 
 // ---- adding ----
-function openForm() {
+function openForm(pri) {
   if (!current) return;
+  if (page !== 'board') showView('board');
+  if (pri !== undefined) $('#newPri').value = String(pri);
   $('#form').hidden = $('#formHint').hidden = false;
   $('#text').focus();
 }
@@ -419,6 +575,7 @@ function closeForm(reset) {
   }
 }
 $('#plus').onclick = () => ($('#form').hidden ? openForm() : closeForm(false));
+$('#newPri').value = '0';
 $('#cancel').onclick = () => closeForm(true);
 
 function addFiles(files) {
@@ -471,9 +628,15 @@ document.addEventListener('paste', (e) => {
   const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
   if (files.length) { e.preventDefault(); addFiles(files); }
 });
-document.addEventListener('dragover', (e) => { e.preventDefault(); $('#form').classList.add('drag'); });
+// File drops anywhere attach images (card drags between columns are handled by the columns).
+document.addEventListener('dragover', (e) => {
+  if (dragging || !e.dataTransfer.types.includes('Files')) return;
+  e.preventDefault();
+  $('#form').classList.add('drag');
+});
 document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('#form').classList.remove('drag'); });
 document.addEventListener('drop', (e) => {
+  if (dragging || !e.dataTransfer.types.includes('Files')) return;
   e.preventDefault();
   $('#form').classList.remove('drag');
   addFiles(e.dataTransfer.files);
@@ -509,11 +672,80 @@ async function browse(path) {
     : [el('li', { className: 'none', textContent: 'No folders inside.' })]));
   $('#pdirs').scrollTop = 0;
 }
-$('#addProject').onclick = () => {
+function openPicker(tab) {
   const p = projects.find((x) => x.file === current);
-  $('#picker').showModal();
+  if (!$('#picker').open) $('#picker').showModal();
+  pickerTab(tab);
   // Start next to the current project, since repos tend to live side by side.
-  browse(p && !p.missing ? p.dir.replace(/[\\/][^\\/]+$/, '') || '' : '');
+  if (tab === 'folder') browse(p && !p.missing ? p.dir.replace(/[\\/][^\\/]+$/, '') || '' : '');
+}
+function pickerTab(tab) {
+  $('#paneFolder').hidden = tab !== 'folder';
+  $('#paneFind').hidden = tab !== 'find';
+  $('#tabFolder').classList.toggle('on', tab === 'folder');
+  $('#tabFind').classList.toggle('on', tab === 'find');
+  if (tab === 'find' && !scanned) scan($('#spath').value || '~');
+  if (tab === 'folder' && !browsing) browse('');
+}
+$('#addProject').onclick = () => openPicker('folder');
+$('#importProject').onclick = () => openPicker('find');
+$('#tabFolder').onclick = () => pickerTab('folder');
+$('#tabFind').onclick = () => pickerTab('find');
+
+// ---- import: find TODO.md files that already exist ----
+let scanned = null;
+let scanSeq = 0;
+const selectedImports = () => [...document.querySelectorAll('#sres input:checked:not(:disabled)')].map((i) => i.value);
+const updateImportBtn = () => {
+  const n = selectedImports().length;
+  $('#simport').disabled = !n;
+  $('#simport').textContent = n ? `Import ${n}` : 'Import';
+};
+async function scan(where) {
+  const seq = ++scanSeq;
+  $('#spath').value = where;
+  $('#sres').replaceChildren(el('li', { className: 'none', textContent: 'Searching…' }));
+  $('#sstatus').textContent = '';
+  updateImportBtn();
+  const r = await api('GET', '/api/scan?path=' + encodeURIComponent(where));
+  if (seq !== scanSeq) return; // a newer search started
+  if (!r.ok) { $('#sres').replaceChildren(); $('#sstatus').textContent = r.data.error; return; }
+  const d = (scanned = r.data);
+  $('#spath').value = d.display;
+  const fresh = d.results.filter((x) => !x.known);
+  $('#sres').replaceChildren(...(d.results.length
+    ? d.results.map((x) => {
+        const tasks = x.open + x.done;
+        return el('li', {}, el('label', { className: x.known ? 'known' : '', title: x.file },
+          el('input', {
+            type: 'checkbox', value: x.file, checked: x.known || tasks > 0, disabled: x.known, onchange: updateImportBtn,
+          }),
+          el('span', {}, el('span', { className: 'nm', textContent: x.name }), el('span', { className: 'pt', textContent: x.path + '/' + x.file.split(/[\\/]/).pop() })),
+          el('span', { className: 'ct', textContent: x.known ? 'already added' : tasks ? `${x.open} open · ${x.done} done` : 'no tasks yet' })));
+      })
+    : [el('li', { className: 'none', textContent: 'No TODO.md files found here.' })]));
+  $('#sstatus').textContent = `${fresh.length} new, ${d.results.length - fresh.length} already added · searched ${d.depth} levels deep` +
+    (d.truncated ? ' · stopped early, try a more specific folder' : '');
+  updateImportBtn();
+}
+$('#sgo').onclick = () => scan($('#spath').value);
+$('#spath').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); scan($('#spath').value); } });
+$('#scancel').onclick = () => $('#picker').close();
+$('#sall').onclick = () => {
+  const boxes = [...document.querySelectorAll('#sres input:not(:disabled)')];
+  const all = boxes.every((b) => b.checked);
+  boxes.forEach((b) => { b.checked = !all; });
+  updateImportBtn();
+};
+$('#simport').onclick = async () => {
+  const files = selectedImports();
+  if (!files.length) return;
+  const r = await api('POST', '/api/projects', { files });
+  if (!r.ok) { $('#sstatus').textContent = r.data.error; return; }
+  $('#picker').close();
+  scanned = null;
+  await loadProjects();
+  await select(r.data.file);
 };
 $('#pup').onclick = () => browsing?.parent && browse(browsing.parent);
 $('#pgo').onclick = () => browse($('#ppath').value);
@@ -537,7 +769,7 @@ $('#pnewName').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); createFolder(); }
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); hideNewFolder(); }
 });
-$('#picker').addEventListener('close', hideNewFolder);
+$('#picker').addEventListener('close', () => { hideNewFolder(); browsing = null; scanned = null; });
 $('#puse').onclick = async () => {
   if (!browsing) return;
   const r = await api('POST', '/api/projects', { dir: browsing.path });
@@ -546,6 +778,65 @@ $('#puse').onclick = async () => {
   await loadProjects();
   await select(r.data.file);
 };
+
+// ---- endpoints view ----
+function showView(v) {
+  page = v;
+  $('#boardView').hidden = v !== 'board';
+  $('#endpointsView').hidden = v !== 'endpoints';
+  $('#endpointsTab').classList.toggle('active', v === 'endpoints');
+  renderProjects();
+  if (v === 'endpoints') loadEndpoints();
+  else render();
+}
+$('#endpointsTab').onclick = () => showView('endpoints');
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch {
+    const t = el('textarea', { value: text });
+    document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  const label = btn.textContent;
+  btn.textContent = 'Copied';
+  setTimeout(() => { btn.textContent = label; }, 1200);
+}
+const snippet = (text) => el('div', { className: 'snip' },
+  el('pre', { textContent: text }),
+  el('button', { type: 'button', className: 'copy', textContent: 'Copy', onclick: (e) => copyText(text, e.currentTarget) }));
+// `code` spans in descriptions -> <code>, everything else as plain text.
+const rich = (s) => s.split('`').map((part, i) => (i % 2 ? el('code', { textContent: part }) : part));
+
+async function loadEndpoints() {
+  const { data } = await api('GET', '/api/endpoints?project=' + encodeURIComponent(current));
+  document.title = 'Endpoints · TODO';
+  $('#epBase').textContent = data.base;
+  const proj = projects.find((p) => p.file === data.project);
+  const prompt = `Use my todo-md task list for this project. Read ${data.guide} to learn the API and the TODO.md format, then use it to read, add and update tasks as you work.`;
+
+  const out = [
+    el('div', { className: 'agent' },
+      el('h2', { textContent: 'For AI agents' }),
+      el('p', {}, 'Point Claude (or any agent) at ', el('code', { textContent: data.guide }),
+        '. It\'s a guide written for agents, with your projects, the TODO.md format, how to work through the list, and every endpoint below with examples.'),
+      snippet(prompt),
+      el('div', { className: 'acts' },
+        el('a', { href: '/llms.txt', target: '_blank', textContent: 'Open llms.txt' }),
+        el('button', { type: 'button', textContent: 'Copy llms.txt URL', onclick: (e) => copyText(data.guide, e.currentTarget) }))),
+    el('p', { className: 'ep-note' }, 'Examples below use ', el('b', { textContent: proj ? proj.name : 'your project' }),
+      proj ? ` (${proj.path}/TODO.md)` : '', '. Agents can also edit TODO.md directly and the board will update.'),
+  ];
+  let group = '';
+  for (const e of data.endpoints) {
+    if (e.group !== group) { group = e.group; out.push(el('h2', { className: 'ep-group', textContent: group })); }
+    out.push(el('div', { className: 'ep' },
+      el('div', { className: 'ep-line' },
+        el('span', { className: 'method m-' + e.method, textContent: e.method }),
+        el('span', { textContent: decodeURIComponent(e.path) })),
+      el('p', {}, ...rich(e.desc)),
+      snippet(e.curl)));
+  }
+  $('#epBody').replaceChildren(...out);
+}
 
 // ---- viewer ----
 let gallery = [];
